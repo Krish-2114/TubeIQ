@@ -1,0 +1,55 @@
+{
+  "best_upload_day": "Tuesday",
+  "upload_day_performance": {
+    "Monday": 1.24,
+    "Tuesday": 1.53,
+    "Wednesday": 1.36,
+    "Thursday": 1.29,
+    "Friday": 1.5,
+    "Saturday": 1.25,
+    "Sunday": 1.45
+  },
+  "optimal_duration": "10-20min",
+  "duration_performance": {
+    "2-10min": 1.03,
+    "10-20min": 1.52,
+    "20-30min": 1.46,
+    "30-60min": 0.92
+  },
+  "number_in_title_boost": 0.9,
+  "question_title_boost": 0.79,
+  "top_keywords": {
+    "reacts": 65,
+    "just": 15,
+    "lego": 14,
+    "china": 13,
+    "scandal": 11,
+    "getting": 9,
+    "michael": 8,
+    "friends": 8,
+    "actually": 7,
+    "chinese": 7,
+    "time": 7,
+    "crazy": 7,
+    "after": 7,
+    "ever": 7,
+    "police": 7,
+    "maybe": 6,
+    "best": 6,
+    "situation": 6,
+    "finally": 6,
+    "about": 6
+  },
+  "niche_difficulty": "Medium",
+  "niche_median_views": 446413,
+  "avg_engagement_rate": 3.11,
+  "total_videos_analyzed": 699,
+  "channels_analyzed": 4,
+  "optimal_title_length": "short",
+  "title_length_performance": {
+    "very_short": 1.27,
+    "short": 1.58,
+    "medium": 1.25,
+    "long": 1.07
+  }
+}

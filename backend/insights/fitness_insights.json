@@ -1,0 +1,55 @@
+{
+  "best_upload_day": "Friday",
+  "upload_day_performance": {
+    "Monday": 1.85,
+    "Tuesday": 1.27,
+    "Wednesday": 1.35,
+    "Thursday": 1.31,
+    "Friday": 1.86,
+    "Saturday": 1.18,
+    "Sunday": 1.85
+  },
+  "optimal_duration": "30-60min",
+  "duration_performance": {
+    "2-10min": 2.12,
+    "10-20min": 1.48,
+    "20-30min": 1.4,
+    "30-60min": 2.3
+  },
+  "number_in_title_boost": 1.4,
+  "question_title_boost": 0.93,
+  "top_keywords": {
+    "exercises": 41,
+    "best": 25,
+    "muscle": 19,
+    "workout": 18,
+    "your": 17,
+    "only": 13,
+    "body": 12,
+    "science": 12,
+    "need": 12,
+    "biceps": 11,
+    "worst": 10,
+    "build": 10,
+    "chest": 10,
+    "most": 10,
+    "perfect": 10,
+    "every": 9,
+    "fitness": 9,
+    "stop": 9,
+    "exercise": 8,
+    "everyone": 8
+  },
+  "niche_difficulty": "Hard",
+  "niche_median_views": 1713578,
+  "avg_engagement_rate": 3.57,
+  "total_videos_analyzed": 400,
+  "channels_analyzed": 2,
+  "optimal_title_length": "short",
+  "title_length_performance": {
+    "very_short": 0.87,
+    "short": 1.7,
+    "medium": 1.61,
+    "long": 0.51
+  }
+}

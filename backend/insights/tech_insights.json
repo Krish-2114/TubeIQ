@@ -1,0 +1,55 @@
+{
+  "best_upload_day": "Sunday",
+  "upload_day_performance": {
+    "Monday": 1.65,
+    "Tuesday": 1.59,
+    "Wednesday": 1.31,
+    "Thursday": 1.49,
+    "Friday": 1.45,
+    "Saturday": 1.07,
+    "Sunday": 2.63
+  },
+  "optimal_duration": "20-30min",
+  "duration_performance": {
+    "2-10min": 0.86,
+    "10-20min": 1.1,
+    "20-30min": 1.38,
+    "30-60min": 0.82
+  },
+  "number_in_title_boost": 0.89,
+  "question_title_boost": 1.08,
+  "top_keywords": {
+    "iphone": 29,
+    "review": 22,
+    "tech": 20,
+    "phone": 16,
+    "impressions": 15,
+    "most": 14,
+    "apple": 13,
+    "every": 12,
+    "tested": 11,
+    "samsung": 10,
+    "ever": 9,
+    "world": 9,
+    "made": 8,
+    "bought": 8,
+    "dream": 8,
+    "smartphone": 7,
+    "best": 7,
+    "linux": 7,
+    "galaxy": 6,
+    "unboxing": 6
+  },
+  "niche_difficulty": "Hard",
+  "niche_median_views": 3364594,
+  "avg_engagement_rate": 3.28,
+  "total_videos_analyzed": 600,
+  "channels_analyzed": 3,
+  "optimal_title_length": "very_short",
+  "title_length_performance": {
+    "very_short": 1.91,
+    "short": 1.39,
+    "medium": 0.89,
+    "long": 0.92
+  }
+}

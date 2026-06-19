@@ -1,0 +1,55 @@
+{
+  "best_upload_day": "Thursday",
+  "upload_day_performance": {
+    "Monday": 1.63,
+    "Tuesday": 1.5,
+    "Wednesday": 1.45,
+    "Thursday": 2.11,
+    "Friday": 1.81,
+    "Saturday": 1.29,
+    "Sunday": 1.33
+  },
+  "optimal_duration": "30-60min",
+  "duration_performance": {
+    "2-10min": 0.69,
+    "10-20min": 1.18,
+    "20-30min": 1.14,
+    "30-60min": 1.22
+  },
+  "number_in_title_boost": 0.94,
+  "question_title_boost": 1.06,
+  "top_keywords": {
+    "laugh": 35,
+    "every": 33,
+    "$10,000": 21,
+    "$1,000": 18,
+    "make": 18,
+    "hours": 17,
+    "guess": 15,
+    "wins": 15,
+    "edition": 15,
+    "bought": 14,
+    "food": 13,
+    "battle": 12,
+    "tried": 11,
+    "subscribe": 10,
+    "find": 9,
+    "last": 9,
+    "deji": 9,
+    "only": 9,
+    "most": 9,
+    "world\u2019s": 8
+  },
+  "niche_difficulty": "Very Hard",
+  "niche_median_views": 5685500,
+  "avg_engagement_rate": 2.51,
+  "total_videos_analyzed": 800,
+  "channels_analyzed": 4,
+  "optimal_title_length": "short",
+  "title_length_performance": {
+    "very_short": 1.54,
+    "short": 1.65,
+    "medium": 1.23,
+    "long": 0.54
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "gaming": {
+    "accuracy": 0.371,
+    "f1": 0.36,
+    "test_size": 280,
+    "train_size": 1117,
+    "top_features": [
+      "duration_encoded",
+      "duration_seconds",
+      "hour_of_day",
+      "has_rupee",
+      "has_win"
+    ]
+  },
+  "entertainment": {
+    "accuracy": 0.444,
+    "f1": 0.384,
+    "test_size": 160,
+    "train_size": 640,
+    "top_features": [
+      "duration_encoded",
+      "has_win",
+      "duration_seconds",
+      "has_vs",
+      "hour_of_day"
+    ]
+  },
+  "cooking": {
+    "accuracy": 0.343,
+    "f1": 0.342,
+    "test_size": 280,
+    "train_size": 1120,
+    "top_features": [
+      "duration_encoded",
+      "hour_of_day",
+      "duration_seconds",
+      "has_challenge",
+      "has_review"
+    ]
+  },
+  "finance": {
+    "accuracy": 0.317,
+    "f1": 0.284,
+    "test_size": 120,
+    "train_size": 480,
+    "top_features": [
+      "duration_encoded",
+      "duration_seconds",
+      "hour_of_day",
+      "has_exclamation",
+      "has_what"
+    ]
+  },
+  "fitness": {
+    "accuracy": 0.325,
+    "f1": 0.31,
+    "test_size": 80,
+    "train_size": 320,
+    "top_features": [
+      "has_vs",
+      "has_only",
+      "has_best",
+      "has_every",
+      "has_worst"
+    ]
+  },
+  "education": {
+    "accuracy": 0.425,
+    "f1": 0.397,
+    "test_size": 80,
+    "train_size": 320,
+    "top_features": [
+      "duration_encoded",
+      "duration_seconds",
+      "has_what",
+      "has_question",
+      "hour_of_day"
+    ]
+  },
+  "tech": {
+    "accuracy": 0.417,
+    "f1": 0.381,
+    "test_size": 120,
+    "train_size": 480,
+    "top_features": [
+      "duration_encoded",
+      "has_every",
+      "duration_seconds",
+      "has_question",
+      "has_number"
+    ]
+  },
+  "streaming": {
+    "accuracy": 0.393,
+    "f1": 0.381,
+    "test_size": 140,
+    "train_size": 559,
+    "top_features": [
+      "duration_encoded",
+      "has_best",
+      "duration_seconds",
+      "has_question",
+      "hour_of_day"
+    ]
+  }
+}

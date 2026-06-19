@@ -1,0 +1,55 @@
+{
+  "best_upload_day": "Friday",
+  "upload_day_performance": {
+    "Monday": 1.52,
+    "Tuesday": 1.72,
+    "Wednesday": 1.6,
+    "Thursday": 1.36,
+    "Friday": 2.02,
+    "Saturday": 1.87,
+    "Sunday": 1.59
+  },
+  "optimal_duration": "2-10min",
+  "duration_performance": {
+    "2-10min": 1.69,
+    "10-20min": 1.43,
+    "20-30min": 1.17,
+    "30-60min": 1.09
+  },
+  "number_in_title_boost": 0.73,
+  "question_title_boost": 1.66,
+  "top_keywords": {
+    "part": 68,
+    "gameplay": 43,
+    "game": 43,
+    "gaming": 29,
+    "stream": 25,
+    "full": 20,
+    "free": 17,
+    "raistar": 16,
+    "fire": 15,
+    "minecraft": 14,
+    "boss": 14,
+    "house": 13,
+    "back": 13,
+    "horror": 12,
+    "pokemon": 12,
+    "palworld": 12,
+    "world": 11,
+    "first": 11,
+    "secret": 11,
+    "finally": 11
+  },
+  "niche_difficulty": "Hard",
+  "niche_median_views": 3452029,
+  "avg_engagement_rate": 5.54,
+  "total_videos_analyzed": 1397,
+  "channels_analyzed": 7,
+  "optimal_title_length": "short",
+  "title_length_performance": {
+    "very_short": 1.62,
+    "short": 1.87,
+    "medium": 1.38,
+    "long": 1.18
+  }
+}

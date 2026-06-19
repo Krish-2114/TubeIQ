@@ -1,0 +1,55 @@
+{
+  "best_upload_day": "Monday",
+  "upload_day_performance": {
+    "Monday": 4.91,
+    "Tuesday": 3.3,
+    "Wednesday": 2.29,
+    "Thursday": 1.09,
+    "Friday": 2.35,
+    "Saturday": 1.53,
+    "Sunday": 1.47
+  },
+  "optimal_duration": "20-30min",
+  "duration_performance": {
+    "2-10min": 1.33,
+    "10-20min": 2.34,
+    "20-30min": 10.81,
+    "30-60min": 2.04
+  },
+  "number_in_title_boost": 0.81,
+  "question_title_boost": 0.54,
+  "top_keywords": {
+    "just": 27,
+    "market": 20,
+    "gold": 16,
+    "china": 14,
+    "money": 13,
+    "2026": 13,
+    "stocks": 13,
+    "silver": 13,
+    "dollar": 12,
+    "know": 12,
+    "about": 11,
+    "stock": 10,
+    "what": 10,
+    "bitcoin": 10,
+    "trump": 9,
+    "much": 9,
+    "breaking": 9,
+    "buying": 9,
+    "global": 9,
+    "india": 9
+  },
+  "niche_difficulty": "Easy",
+  "niche_median_views": 65368,
+  "avg_engagement_rate": 2.27,
+  "total_videos_analyzed": 600,
+  "channels_analyzed": 3,
+  "optimal_title_length": "very_short",
+  "title_length_performance": {
+    "very_short": 2.95,
+    "short": 2.61,
+    "medium": 1.98,
+    "long": 1.82
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "best_upload_day": "Tuesday",
+  "upload_day_performance": {
+    "Monday": 0.76,
+    "Tuesday": 1.58,
+    "Wednesday": 1.46,
+    "Thursday": 1.18,
+    "Friday": 1.21,
+    "Saturday": 1.12,
+    "Sunday": 1.11
+  },
+  "optimal_duration": "30-60min",
+  "duration_performance": {
+    "2-10min": 1.15,
+    "10-20min": 1.49,
+    "20-30min": 1.49,
+    "30-60min": 1.55
+  },
+  "number_in_title_boost": 0.89,
+  "question_title_boost": 0.99,
+  "top_keywords": {
+    "what": 21,
+    "most": 11,
+    "earth": 10,
+    "universe": 9,
+    "than": 8,
+    "black": 8,
+    "happens": 8,
+    "math": 8,
+    "your": 7,
+    "about": 7,
+    "let's": 5,
+    "world": 5,
+    "will": 5,
+    "time": 5,
+    "dangerous": 5,
+    "hole": 5,
+    "something": 5,
+    "problem": 5,
+    "world's": 5,
+    "ever": 4
+  },
+  "niche_difficulty": "Very Hard",
+  "niche_median_views": 7168467,
+  "avg_engagement_rate": 3.9,
+  "total_videos_analyzed": 400,
+  "channels_analyzed": 2,
+  "optimal_title_length": "medium",
+  "title_length_performance": {
+    "very_short": 1.0,
+    "short": 1.37,
+    "medium": 1.51,
+    "long": 0.7
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "best_upload_day": "Monday",
+  "upload_day_performance": {
+    "Monday": 6.92,
+    "Tuesday": 1.84,
+    "Wednesday": 1.48,
+    "Thursday": 1.96,
+    "Friday": 1.59,
+    "Saturday": 1.73,
+    "Sunday": 3.73
+  },
+  "optimal_duration": "10-20min",
+  "duration_performance": {
+    "2-10min": 1.14,
+    "10-20min": 2.6,
+    "20-30min": 2.04,
+    "30-60min": 2.57
+  },
+  "number_in_title_boost": 0.61,
+  "question_title_boost": 1.93,
+  "top_keywords": {
+    "kitchen": 66,
+    "every": 50,
+    "food": 50,
+    "chicken": 50,
+    "best": 49,
+    "tried": 41,
+    "chef": 37,
+    "nightmares": 37,
+    "make": 29,
+    "season": 29,
+    "sandwich": 26,
+    "brand": 25,
+    "compilation": 24,
+    "recipe": 20,
+    "perfect": 18,
+    "gadgets": 18,
+    "ultimate": 18,
+    "fried": 17,
+    "breakfast": 17,
+    "ingredients": 17
+  },
+  "niche_difficulty": "Medium",
+  "niche_median_views": 257426,
+  "avg_engagement_rate": 2.57,
+  "total_videos_analyzed": 1400,
+  "channels_analyzed": 7,
+  "optimal_title_length": "long",
+  "title_length_performance": {
+    "very_short": 1.31,
+    "short": 1.56,
+    "medium": 3.98,
+    "long": 5.46
+  }
+}
