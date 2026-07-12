@@ -1,5 +1,4 @@
 import json
-import re
 from pathlib import Path
 
 import joblib
@@ -17,20 +16,6 @@ MODELS_DIR = BASE_DIR / "saved_models"
 DATA_DIR = BASE_DIR / "data"
 INSIGHTS_DIR = BASE_DIR / "insights"
 
-FEATURE_COLUMNS = [
-    "duration_seconds", "duration_encoded",
-    "day_of_week", "hour_of_day",
-    "title_length", "word_count",
-    "has_number", "has_dollar", "has_rupee",
-    "has_question", "has_exclamation",
-    "has_vs", "has_challenge", "has_hours",
-    "has_last", "has_win", "has_free",
-    "has_extreme", "has_best", "has_worst",
-    "has_every", "has_first", "has_only",
-    "has_never", "has_days", "has_review",
-    "has_how", "has_why", "has_what",
-]
-
 _cache: dict = {}
 
 app = FastAPI(title="TubeIQ API")
@@ -47,9 +32,12 @@ app.add_middleware(
 class PredictRequest(BaseModel):
     title: str
     niche: str
-    duration_seconds: int
-    upload_day: int
-    upload_hour: int
+
+
+class CompareRequest(BaseModel):
+    niche: str
+    title_a: str
+    title_b: str
 
 
 class SimilarRequest(BaseModel):
@@ -73,8 +61,8 @@ class ImproveTitleRequest(BaseModel):
 
 def get_available_niches() -> list[str]:
     niches = []
-    for path in MODELS_DIR.glob("xgboost_*.pkl"):
-        niche = path.stem.replace("xgboost_", "")
+    for path in MODELS_DIR.glob("tfidf_*.pkl"):
+        niche = path.stem.replace("tfidf_", "")
         niches.append(niche)
     return sorted(niches)
 
@@ -90,28 +78,13 @@ def _model_path(name: str) -> Path:
 
 
 def _require_niche(niche: str) -> None:
-    model_path = _model_path(f"xgboost_{niche}.pkl")
-    if not model_path.exists():
+    model_path = _model_path(f"tfidf_{niche}.pkl")
+    ref_path = _model_path(f"reference_set_{niche}.pkl")
+    if not model_path.exists() or not ref_path.exists():
         raise HTTPException(
             status_code=404,
             detail=f"No trained model found for niche '{niche}'",
         )
-
-
-def load_xgboost(niche: str):
-    return _cache_get(
-        f"xgboost_{niche}",
-        lambda: joblib.load(_model_path(f"xgboost_{niche}.pkl")),
-    )
-
-
-def load_label_encoder(niche: str):
-    return _cache_get(
-        f"label_encoder_{niche}",
-        lambda: joblib.load(
-            _model_path(f"label_encoder_{niche}.pkl")
-        ),
-    )
 
 
 def load_tfidf(niche: str):
@@ -125,6 +98,32 @@ def load_tfidf(niche: str):
         f"tfidf_{niche}",
         lambda: joblib.load(path),
     )
+
+
+def load_reference_set(niche: str):
+    path = _model_path(f"reference_set_{niche}.pkl")
+    if not path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"No reference set found for niche '{niche}'"
+            ),
+        )
+    return _cache_get(
+        f"reference_set_{niche}",
+        lambda: joblib.load(path),
+    )
+
+
+def load_all_vecs(niche: str):
+    """Precompute TF-IDF vectors for every title in the niche CSV."""
+    def loader():
+        tfidf = load_tfidf(niche)
+        df = load_niche_csv(niche)
+        titles = df["title"].fillna("").tolist()
+        return tfidf.transform(titles)
+
+    return _cache_get(f"all_vecs_{niche}", loader)
 
 
 def load_kmeans(niche: str):
@@ -183,104 +182,6 @@ def load_insights(niche: str) -> dict:
     return _cache_get(f"insights_{niche}", loader)
 
 
-def parse_duration_encoded(seconds: int) -> int:
-    if seconds < 120:
-        return 0
-    if seconds < 600:
-        return 1
-    if seconds < 1800:
-        return 2
-    return 3
-
-
-def extract_title_features(title: str) -> dict:
-    if not title:
-        return {
-            "title_length": 0,
-            "word_count": 0,
-            "has_number": 0,
-            "has_dollar": 0,
-            "has_rupee": 0,
-            "has_question": 0,
-            "has_exclamation": 0,
-            "has_vs": 0,
-            "has_challenge": 0,
-            "has_hours": 0,
-            "has_last": 0,
-            "has_win": 0,
-            "has_free": 0,
-            "has_extreme": 0,
-            "has_best": 0,
-            "has_worst": 0,
-            "has_every": 0,
-            "has_first": 0,
-            "has_only": 0,
-            "has_never": 0,
-            "has_days": 0,
-            "has_review": 0,
-            "has_how": 0,
-            "has_why": 0,
-            "has_what": 0,
-        }
-
-    title_lower = title.lower()
-    return {
-        "title_length": len(title),
-        "word_count": len(title.split()),
-        "has_number": int(bool(re.search(r"\d", title))),
-        "has_dollar": int("$" in title),
-        "has_rupee": int(
-            "₹" in title
-            or "rs." in title_lower
-            or "rupee" in title_lower
-        ),
-        "has_question": int("?" in title),
-        "has_exclamation": int("!" in title),
-        "has_vs": int(
-            " vs" in title_lower or "vs " in title_lower
-        ),
-        "has_challenge": int("challenge" in title_lower),
-        "has_hours": int(
-            "hours" in title_lower or "hour" in title_lower
-        ),
-        "has_last": int("last" in title_lower),
-        "has_win": int(
-            " win" in title_lower or "wins" in title_lower
-        ),
-        "has_free": int("free" in title_lower),
-        "has_extreme": int("extreme" in title_lower),
-        "has_best": int("best" in title_lower),
-        "has_worst": int("worst" in title_lower),
-        "has_every": int("every" in title_lower),
-        "has_first": int("first" in title_lower),
-        "has_only": int("only" in title_lower),
-        "has_never": int("never" in title_lower),
-        "has_days": int(
-            "days" in title_lower or "day" in title_lower
-        ),
-        "has_review": int("review" in title_lower),
-        "has_how": int(title_lower.startswith("how")),
-        "has_why": int(title_lower.startswith("why")),
-        "has_what": int(title_lower.startswith("what")),
-    }
-
-
-def build_feature_row(
-    title: str,
-    duration_seconds: int,
-    upload_day: int,
-    upload_hour: int,
-) -> pd.DataFrame:
-    feats = extract_title_features(title)
-    feats["duration_seconds"] = duration_seconds
-    feats["duration_encoded"] = parse_duration_encoded(
-        duration_seconds
-    )
-    feats["day_of_week"] = upload_day
-    feats["hour_of_day"] = upload_hour
-    return pd.DataFrame([feats])[FEATURE_COLUMNS]
-
-
 @app.get("/health")
 def health():
     return {
@@ -295,35 +196,47 @@ def root():
 
 
 @app.post("/predict")
-def predict(body: PredictRequest):
-    _require_niche(body.niche)
+def predict_title(req: PredictRequest):
+    _require_niche(req.niche)
 
-    model = load_xgboost(body.niche)
-    label_encoder = load_label_encoder(body.niche)
+    tfidf = load_tfidf(req.niche)
+    ref = load_reference_set(req.niche)
+    all_vecs = load_all_vecs(req.niche)
 
-    X = build_feature_row(
-        body.title,
-        body.duration_seconds,
-        body.upload_day,
-        body.upload_hour,
-    )
-
-    pred_encoded = model.predict(X)[0]
-    pred_proba = model.predict_proba(X)[0]
-    label = str(label_encoder.inverse_transform([pred_encoded])[0])
-    confidence = round(float(max(pred_proba)), 4)
-
-    probabilities = {
-        str(label_encoder.inverse_transform([i])[0]): round(
-            float(p), 4
-        )
-        for i, p in enumerate(pred_proba)
-    }
+    vec = tfidf.transform([req.title])
+    score = float(cosine_similarity(vec, ref["vectors"]).mean())
+    all_scores = cosine_similarity(
+        all_vecs, ref["vectors"]
+    ).mean(axis=1)
+    percentile = float((all_scores < score).mean() * 100)
 
     return {
-        "label": label,
-        "confidence": confidence,
-        "probabilities": probabilities,
+        "score": score,
+        "percentile": percentile,
+    }
+
+
+@app.post("/compare")
+def compare_titles(req: CompareRequest):
+    _require_niche(req.niche)
+
+    tfidf = load_tfidf(req.niche)
+    ref = load_reference_set(req.niche)
+
+    vec_a = tfidf.transform([req.title_a])
+    vec_b = tfidf.transform([req.title_b])
+    score_a = float(
+        cosine_similarity(vec_a, ref["vectors"]).mean()
+    )
+    score_b = float(
+        cosine_similarity(vec_b, ref["vectors"]).mean()
+    )
+
+    winner = "title_a" if score_a > score_b else "title_b"
+    return {
+        "winner": winner,
+        "title_a_score": score_a,
+        "title_b_score": score_b,
     }
 
 

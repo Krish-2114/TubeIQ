@@ -4,18 +4,10 @@ import joblib
 import os
 import json
 import re
-from xgboost import XGBClassifier
 from sklearn.feature_extraction.text import (
     TfidfVectorizer
 )
 from sklearn.cluster import KMeans
-from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import (
-    accuracy_score,
-    f1_score,
-    classification_report
-)
-from sklearn.model_selection import train_test_split
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -98,101 +90,6 @@ def clean_title(title, channel_title):
     return ' '.join(cleaned)
 
 
-def train_xgboost_for_niche(df, niche):
-    print(f"\n  Training XGBoost for {niche}...")
-
-    df = df.dropna(subset=FEATURE_COLUMNS +
-                   ['performance_label'])
-
-    if len(df) < 50:
-        print(f"  Skipping — only {len(df)} rows")
-        return None, None
-
-    X = df[FEATURE_COLUMNS].fillna(0)
-    y_raw = df['performance_label']
-
-    le = LabelEncoder()
-    le.fit(['Low', 'Medium', 'High', 'Viral'])
-    y = le.transform(y_raw)
-
-    # Time-based split — last 20% as test
-    split_idx = int(len(df) * 0.8)
-    X_train = X.iloc[:split_idx]
-    X_test  = X.iloc[split_idx:]
-    y_train = y[:split_idx]
-    y_test  = y[split_idx:]
-
-    if len(X_test) < 10:
-        X_train, X_test, y_train, y_test = \
-            train_test_split(
-                X, y, test_size=0.2,
-                random_state=42,
-                stratify=y
-            )
-
-    model = XGBClassifier(
-        n_estimators=200,
-        max_depth=4,
-        learning_rate=0.05,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        min_child_weight=3,
-        use_label_encoder=False,
-        eval_metric='mlogloss',
-        random_state=42,
-        n_jobs=-1
-    )
-
-    model.fit(
-        X_train, y_train,
-        eval_set=[(X_test, y_test)],
-        verbose=False
-    )
-
-    preds = model.predict(X_test)
-    accuracy = accuracy_score(y_test, preds)
-    f1 = f1_score(
-        y_test, preds, average='weighted'
-    )
-
-    print(f"  Accuracy: {accuracy:.3f} | "
-          f"F1: {f1:.3f}")
-    print(f"  Test size: {len(X_test)} videos")
-
-    # Feature importance
-    importance = dict(zip(
-        FEATURE_COLUMNS,
-        model.feature_importances_
-    ))
-    top_features = sorted(
-        importance.items(),
-        key=lambda x: x[1],
-        reverse=True
-    )[:5]
-    print(f"  Top features: "
-          f"{[f[0] for f in top_features]}")
-
-    # Save model and encoder
-    joblib.dump(
-        model,
-        f"backend/saved_models/"
-        f"xgboost_{niche}.pkl"
-    )
-    joblib.dump(
-        le,
-        f"backend/saved_models/"
-        f"label_encoder_{niche}.pkl"
-    )
-
-    return model, {
-        "accuracy": round(accuracy, 3),
-        "f1": round(f1, 3),
-        "test_size": len(X_test),
-        "train_size": len(X_train),
-        "top_features": [f[0] for f in top_features]
-    }
-
-
 def train_tfidf_for_niche(df, niche):
     print(f"\n  Training TF-IDF for {niche}...")
 
@@ -224,6 +121,30 @@ def train_tfidf_for_niche(df, niche):
         f"backend/saved_models/"
         f"tfidf_{niche}.pkl"
     )
+
+    # Proven-winners reference set for title comparison
+    high_viral_mask = df['performance_label'].isin(
+        ['High', 'Viral']
+    )
+    reference_titles = df.loc[
+        high_viral_mask, 'title'
+    ].fillna('').tolist()
+    if reference_titles:
+        reference_vecs = tfidf.transform(reference_titles)
+        joblib.dump(
+            {
+                'titles': reference_titles,
+                'vectors': reference_vecs,
+            },
+            f"backend/saved_models/"
+            f"reference_set_{niche}.pkl"
+        )
+        print(
+            f"  Reference set: "
+            f"{len(reference_titles)} High/Viral titles"
+        )
+    else:
+        print("  Reference set: skipped — no High/Viral titles")
 
     print(f"  Vocabulary size: "
           f"{len(tfidf.vocabulary_)}")
@@ -278,8 +199,15 @@ def train_kmeans_for_niche(df, niche, n_clusters=6):
     print(f"  Clusters:")
     for cluster_id, keywords in \
             cluster_keywords.items():
-        print(f"    Cluster {cluster_id}: "
-              f"{', '.join(keywords)}")
+        joined = ", ".join(keywords)
+        # Windows console encoding can throw UnicodeEncodeError (e.g. emojis).
+        safe_joined = joined.encode("cp1252", errors="replace").decode(
+            "cp1252"
+        )
+        print(
+            f"    Cluster {cluster_id}: "
+            f"{safe_joined}"
+        )
 
     joblib.dump(
         kmeans,
@@ -302,7 +230,7 @@ def train_all_models():
     print("TRAINING ALL TUBEIQ MODELS")
     print("="*50)
 
-    all_results = {}
+    trained = []
 
     for niche in NICHES:
         path = f"backend/data/{niche}_features.csv"
@@ -319,36 +247,18 @@ def train_all_models():
         df = pd.read_csv(path)
         print(f"Loaded {len(df)} videos")
 
-        # Train XGBoost
-        model, xgb_results = \
-            train_xgboost_for_niche(df, niche)
-
-        # Train TF-IDF
+        # Train TF-IDF (+ reference set)
         tfidf = train_tfidf_for_niche(df, niche)
 
         # Train K-Means
         if tfidf:
-            kmeans, clusters = \
-                train_kmeans_for_niche(df, niche)
-
-        if xgb_results:
-            all_results[niche] = xgb_results
+            train_kmeans_for_niche(df, niche)
+            trained.append(niche)
 
     print(f"\n{'='*50}")
     print(f"TRAINING COMPLETE")
     print(f"{'='*50}")
-    print(f"\nXGBoost Results Summary:")
-    for niche, results in all_results.items():
-        print(f"  {niche:<15} "
-              f"Accuracy: {results['accuracy']:.3f} "
-              f"F1: {results['f1']:.3f}")
-
-    # Save training results
-    with open(
-        "backend/saved_models/training_results.json",
-        'w'
-    ) as f:
-        json.dump(all_results, f, indent=2)
+    print(f"\nTrained niches: {', '.join(trained) or 'none'}")
 
     print(f"\nAll models saved to "
           f"backend/saved_models/")

@@ -1,85 +1,152 @@
 {
   "gaming": {
-    "accuracy": 0.371,
-    "f1": 0.36,
-    "test_size": 280,
-    "train_size": 1117,
+    "accuracy": 0.31,
+    "f1": 0.289,
+    "baseline_accuracy": 0.35,
+    "test_size": 400,
+    "train_size": 997,
     "top_features": [
       "duration_encoded",
       "duration_seconds",
-      "hour_of_day",
-      "has_rupee",
-      "has_win"
-    ]
+      "has_days",
+      "has_number",
+      "hour_of_day"
+    ],
+    "per_channel_accuracy": {
+      "Techno Gamerz": {
+        "accuracy": 0.315,
+        "n": 200
+      },
+      "CarryMinati": {
+        "accuracy": 0.305,
+        "n": 200
+      }
+    }
   },
   "entertainment": {
-    "accuracy": 0.444,
-    "f1": 0.384,
-    "test_size": 160,
-    "train_size": 640,
+    "accuracy": 0.375,
+    "f1": 0.342,
+    "baseline_accuracy": 0.35,
+    "test_size": 200,
+    "train_size": 600,
     "top_features": [
-      "duration_encoded",
       "has_win",
+      "duration_encoded",
       "duration_seconds",
-      "has_vs",
-      "hour_of_day"
-    ]
+      "has_dollar",
+      "has_days"
+    ],
+    "per_channel_accuracy": {
+      "Dude Perfect": {
+        "accuracy": 0.375,
+        "n": 200
+      }
+    }
   },
   "cooking": {
-    "accuracy": 0.343,
-    "f1": 0.342,
-    "test_size": 280,
-    "train_size": 1120,
+    "accuracy": 0.318,
+    "f1": 0.307,
+    "baseline_accuracy": 0.35,
+    "test_size": 400,
+    "train_size": 1000,
     "top_features": [
       "duration_encoded",
-      "hour_of_day",
+      "has_question",
       "duration_seconds",
-      "has_challenge",
-      "has_review"
-    ]
+      "has_every",
+      "has_exclamation"
+    ],
+    "per_channel_accuracy": {
+      "Gordon Ramsay": {
+        "accuracy": 0.305,
+        "n": 200
+      },
+      "Binging with Babish": {
+        "accuracy": 0.33,
+        "n": 200
+      }
+    }
   },
   "finance": {
-    "accuracy": 0.317,
-    "f1": 0.284,
+    "accuracy": 0.492,
+    "f1": 0.484,
+    "baseline_accuracy": 0.35,
     "test_size": 120,
     "train_size": 480,
     "top_features": [
+      "has_exclamation",
+      "has_what",
       "duration_encoded",
       "duration_seconds",
-      "hour_of_day",
-      "has_exclamation",
-      "has_what"
-    ]
+      "hour_of_day"
+    ],
+    "per_channel_accuracy": {
+      "Graham Stephan": {
+        "accuracy": 0.636,
+        "n": 33
+      },
+      "Andrei Jikh": {
+        "accuracy": 0.372,
+        "n": 43
+      },
+      "CA Rachana Phadke Ranade": {
+        "accuracy": 0.5,
+        "n": 44
+      }
+    }
   },
   "fitness": {
-    "accuracy": 0.325,
-    "f1": 0.31,
+    "accuracy": 0.2,
+    "f1": 0.192,
+    "baseline_accuracy": 0.35,
     "test_size": 80,
     "train_size": 320,
     "top_features": [
-      "has_vs",
-      "has_only",
-      "has_best",
       "has_every",
-      "has_worst"
-    ]
+      "has_how",
+      "has_exclamation",
+      "has_only",
+      "word_count"
+    ],
+    "per_channel_accuracy": {
+      "Jeff Nippard": {
+        "accuracy": 0.184,
+        "n": 38
+      },
+      "ATHLEAN-X\u2122": {
+        "accuracy": 0.214,
+        "n": 42
+      }
+    }
   },
   "education": {
-    "accuracy": 0.425,
-    "f1": 0.397,
+    "accuracy": 0.35,
+    "f1": 0.342,
+    "baseline_accuracy": 0.35,
     "test_size": 80,
     "train_size": 320,
     "top_features": [
       "duration_encoded",
       "duration_seconds",
-      "has_what",
-      "has_question",
-      "hour_of_day"
-    ]
+      "has_number",
+      "has_how",
+      "has_exclamation"
+    ],
+    "per_channel_accuracy": {
+      "Kurzgesagt \u2013 In a Nutshell": {
+        "accuracy": 0.447,
+        "n": 38
+      },
+      "Veritasium": {
+        "accuracy": 0.262,
+        "n": 42
+      }
+    }
   },
   "tech": {
-    "accuracy": 0.417,
-    "f1": 0.381,
+    "accuracy": 0.367,
+    "f1": 0.359,
+    "baseline_accuracy": 0.35,
     "test_size": 120,
     "train_size": 480,
     "top_features": [
@@ -87,20 +154,41 @@
       "has_every",
       "duration_seconds",
       "has_question",
-      "has_number"
-    ]
+      "has_vs"
+    ],
+    "per_channel_accuracy": {
+      "Marques Brownlee": {
+        "accuracy": 0.424,
+        "n": 33
+      },
+      "Linus Tech Tips": {
+        "accuracy": 0.419,
+        "n": 43
+      },
+      "Mrwhosetheboss": {
+        "accuracy": 0.273,
+        "n": 44
+      }
+    }
   },
   "streaming": {
-    "accuracy": 0.393,
-    "f1": 0.381,
-    "test_size": 140,
-    "train_size": 559,
+    "accuracy": 0.31,
+    "f1": 0.261,
+    "baseline_accuracy": 0.35,
+    "test_size": 100,
+    "train_size": 599,
     "top_features": [
       "duration_encoded",
-      "has_best",
+      "has_vs",
       "duration_seconds",
       "has_question",
-      "hour_of_day"
-    ]
+      "has_exclamation"
+    ],
+    "per_channel_accuracy": {
+      "Pokimane": {
+        "accuracy": 0.31,
+        "n": 100
+      }
+    }
   }
 }

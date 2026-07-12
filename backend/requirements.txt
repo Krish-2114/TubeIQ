@@ -8,7 +8,6 @@ isodate
 pandas
 numpy
 scikit-learn
-xgboost
 joblib
 google-api-python-client
 nltk

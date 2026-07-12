@@ -12,9 +12,12 @@ from backend.ml.train_models import clean_title
 def parse_duration_category(seconds):
     if seconds is None or seconds <= 0:
         return "unknown"
-    if seconds < 120:    return "short"
-    if seconds < 600:    return "medium"
-    if seconds < 1800:   return "long"
+    if seconds < 120:
+        return "short"
+    if seconds < 600:
+        return "medium"
+    if seconds < 1800:
+        return "long"
     return "very_long"
 
 
@@ -99,15 +102,45 @@ def extract_title_features(title):
     }
 
 
-def get_performance_label(view_count,
-                          channel_median):
-    if channel_median == 0:
+def compute_channel_thresholds(velocities):
+    """Per-channel percentile cutoffs on age-corrected view velocity."""
+    arr = np.array(velocities)
+    return {
+        "q25": np.percentile(arr, 25),
+        "q60": np.percentile(arr, 60),
+        "q90": np.percentile(arr, 90),
+    }
+
+
+def get_performance_label(velocity, thresholds):
+    if velocity < thresholds["q25"]:
+        return "Low"
+    if velocity < thresholds["q60"]:
         return "Medium"
-    ratio = view_count / channel_median
-    if ratio < 0.5:  return "Low"
-    if ratio < 1.0:  return "Medium"
-    if ratio < 3.0:  return "High"
+    if velocity < thresholds["q90"]:
+        return "High"
     return "Viral"
+
+
+def video_age_days(published_at, now=None):
+    """Days since publish, floored at 1. Returns None if published_at missing."""
+    if not published_at:
+        return None
+    now = now or datetime.utcnow()
+    pub = published_at
+    if getattr(pub, "tzinfo", None) is not None:
+        pub = pub.replace(tzinfo=None)
+    elif isinstance(pub, str):
+        try:
+            pub = datetime.fromisoformat(
+                pub.replace("Z", "+00:00")
+            ).replace(tzinfo=None)
+        except Exception:
+            return None
+    try:
+        return max((now - pub).days, 1)
+    except Exception:
+        return None
 
 
 def engineer_features_for_niche(niche):
@@ -131,22 +164,28 @@ def engineer_features_for_niche(niche):
             if not videos:
                 continue
 
-            view_counts = [
-                v.view_count for v in videos
-                if v.view_count and v.view_count > 0
-            ]
-            if not view_counts:
-                continue
-
-            channel_median = np.median(view_counts)
-
+            now = datetime.utcnow()
+            eligible = []
             for v in videos:
-                if not v.view_count or \
-                   v.view_count <= 0:
+                if not v.view_count or v.view_count <= 0:
                     continue
                 if not v.title:
                     continue
+                age_days = video_age_days(v.published_at, now=now)
+                if age_days is None:
+                    continue
+                view_velocity = v.view_count / age_days
+                eligible.append((v, age_days, view_velocity))
 
+            if not eligible:
+                continue
+
+            view_counts = [v.view_count for v, _, _ in eligible]
+            velocities = [vel for _, _, vel in eligible]
+            channel_median = np.median(view_counts)
+            thresholds = compute_channel_thresholds(velocities)
+
+            for v, age_days, view_velocity in eligible:
                 title_feats = extract_title_features(
                     v.title
                 )
@@ -205,6 +244,8 @@ def engineer_features_for_niche(niche):
                     "engagement_rate": eng_rate,
                     "day_of_week": day_of_week,
                     "hour_of_day": hour_of_day,
+                    "age_days": age_days,
+                    "view_velocity": view_velocity,
                     "duration_category":
                         parse_duration_category(
                             duration
@@ -217,8 +258,8 @@ def engineer_features_for_niche(niche):
                         ),
                     "performance_label":
                         get_performance_label(
-                            v.view_count,
-                            channel_median
+                            view_velocity,
+                            thresholds
                         ),
                     **title_feats
                 }

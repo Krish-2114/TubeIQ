@@ -1,54 +1,43 @@
 import { useState } from 'react';
 import {
   NICHES,
-  LABEL_RANK,
-  predictTitle,
+  compareTitles,
   capitalize,
-  probToPercent,
 } from '../utils/api';
 import PageLayout from '../components/PageLayout';
 import GlassCard from '../components/GlassCard';
 import SectionHeader from '../components/SectionHeader';
-import TitleInputPanel from '../components/TitleInputPanel';
-import PredictionCertainty from '../components/PredictionCertainty';
 import CrownIcon from '../components/CrownIcon';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { ProbabilityChart } from '../components/Charts';
 
 const defaultPanel = {
   title: '',
   niche: 'gaming',
-  duration: 10,
-  uploadDay: 5,
-  uploadHour: 18,
 };
 
 export default function ABTest() {
   const [panelA, setPanelA] = useState({ ...defaultPanel });
-  const [panelB, setPanelB] = useState({ ...defaultPanel, niche: 'tech' });
-  const [resultA, setResultA] = useState(null);
-  const [resultB, setResultB] = useState(null);
+  const [panelB, setPanelB] = useState({ ...defaultPanel });
+  const [result, setResult] = useState(null);
   const [comparing, setComparing] = useState(false);
   const [error, setError] = useState('');
 
   const handleCompare = async () => {
     if (!panelA.title.trim() || !panelB.title.trim()) return;
+    if (panelA.niche !== panelB.niche) {
+      setError('Both titles must use the same niche for a fair comparison.');
+      return;
+    }
     setComparing(true);
     setError('');
+    setResult(null);
     try {
-      const mkBody = (p) => ({
-        title: p.title.trim(),
-        niche: p.niche,
-        duration_seconds: p.duration * 60,
-        upload_day: p.uploadDay,
-        upload_hour: p.uploadHour,
+      const comparison = await compareTitles({
+        niche: panelA.niche,
+        title_a: panelA.title.trim(),
+        title_b: panelB.title.trim(),
       });
-      const [a, b] = await Promise.all([
-        predictTitle(mkBody(panelA)),
-        predictTitle(mkBody(panelB)),
-      ]);
-      setResultA(a);
-      setResultB(b);
+      setResult(comparison);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -56,18 +45,10 @@ export default function ABTest() {
     }
   };
 
-  const getWinner = () => {
-    if (!resultA || !resultB) return null;
-    const rankA = LABEL_RANK[resultA.label] || 0;
-    const rankB = LABEL_RANK[resultB.label] || 0;
-    if (rankA > rankB) return 'A';
-    if (rankB > rankA) return 'B';
-    return probToPercent(resultA.confidence) >= probToPercent(resultB.confidence)
-      ? 'A'
-      : 'B';
-  };
+  const scorePct = (score) =>
+    Number.isFinite(score) ? `${(score * 100).toFixed(1)}%` : '—';
 
-  const winner = getWinner();
+  const winner = result?.winner === 'title_a' ? 'A' : result?.winner === 'title_b' ? 'B' : null;
 
   return (
     <PageLayout>
@@ -75,22 +56,47 @@ export default function ABTest() {
         <SectionHeader
           label="A/B TEST"
           title="Title A/B Tester"
-          subtitle="Compare two title ideas side by side. The winner is the higher performance tier, or the higher class probability if tied."
+          subtitle="Compare two title ideas in the same niche. The winner is closer to proven High/Viral titles."
         />
 
+        <div className="mb-6 max-w-xs">
+          <label className="field-label">Niche</label>
+          <select
+            className="select-field"
+            value={panelA.niche}
+            onChange={(e) => {
+              const niche = e.target.value;
+              setPanelA({ ...panelA, niche });
+              setPanelB({ ...panelB, niche });
+            }}
+          >
+            {NICHES.map((n) => (
+              <option key={n} value={n}>{capitalize(n)}</option>
+            ))}
+          </select>
+        </div>
+
         <div className="flex flex-col lg:flex-row gap-5 mb-8">
-          <TitleInputPanel
-            label="Title A"
-            borderColor="#ff0000"
-            state={panelA}
-            setState={setPanelA}
-          />
-          <TitleInputPanel
-            label="Title B"
-            borderColor="#a855f7"
-            state={panelB}
-            setState={setPanelB}
-          />
+          <GlassCard className="p-6 flex-1" accent="#ff0000">
+            <h3 className="section-heading text-lg mb-5">Title A</h3>
+            <label className="field-label">Title</label>
+            <input
+              className="input-field"
+              placeholder="Enter title..."
+              value={panelA.title}
+              onChange={(e) => setPanelA({ ...panelA, title: e.target.value })}
+            />
+          </GlassCard>
+          <GlassCard className="p-6 flex-1" accent="#a855f7">
+            <h3 className="section-heading text-lg mb-5">Title B</h3>
+            <label className="field-label">Title</label>
+            <input
+              className="input-field"
+              placeholder="Enter title..."
+              value={panelB.title}
+              onChange={(e) => setPanelB({ ...panelB, title: e.target.value })}
+            />
+          </GlassCard>
         </div>
 
         <div className="flex justify-center mb-8">
@@ -106,35 +112,43 @@ export default function ABTest() {
 
         {error && <p className="error-msg text-center max-w-md mx-auto">{error}</p>}
 
-        {(resultA || resultB) && (
+        {result && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 fade-in">
             {[
-              { label: 'A', result: resultA, color: '#ff0000', glow: 'winner-glow-red' },
-              { label: 'B', result: resultB, color: '#a855f7', glow: 'winner-glow-purple' },
-            ].map(({ label, result, color, glow }) =>
-              result ? (
-                <GlassCard
-                  key={label}
-                  className={`p-6 relative ${winner === label ? glow : ''}`}
-                >
-                  {winner === label && (
-                    <div className="absolute top-5 right-5">
-                      <CrownIcon color={color} />
-                    </div>
-                  )}
-                  <p className="field-label mb-4">Title {label} Result</p>
-                  <PredictionCertainty
-                    label={result.label}
-                    confidence={result.confidence}
-                    size="md"
-                  />
-                  <div className="mt-6 pt-5 border-t" style={{ borderColor: '#f4f4f5' }}>
-                    <p className="field-label mb-3">All class probabilities</p>
-                    <ProbabilityChart probabilities={result.probabilities} height={170} />
+              {
+                label: 'A',
+                title: panelA.title,
+                score: result.title_a_score,
+                color: '#ff0000',
+                glow: 'winner-glow-red',
+              },
+              {
+                label: 'B',
+                title: panelB.title,
+                score: result.title_b_score,
+                color: '#a855f7',
+                glow: 'winner-glow-purple',
+              },
+            ].map(({ label, title, score, color, glow }) => (
+              <GlassCard
+                key={label}
+                className={`p-6 relative ${winner === label ? glow : ''}`}
+              >
+                {winner === label && (
+                  <div className="absolute top-5 right-5">
+                    <CrownIcon color={color} />
                   </div>
-                </GlassCard>
-              ) : null
-            )}
+                )}
+                <p className="field-label mb-2">Title {label} Result</p>
+                <p className="text-sm mb-4 line-clamp-3">{title}</p>
+                <p className="text-3xl font-semibold" style={{ color: '#18181b' }}>
+                  {scorePct(score)}
+                </p>
+                <p className="text-xs mt-2" style={{ color: '#a1a1aa' }}>
+                  Mean similarity to High/Viral reference titles
+                </p>
+              </GlassCard>
+            ))}
           </div>
         )}
       </div>

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pandas as pd
 import numpy as np
 from backend.database import SessionLocal
@@ -8,7 +10,9 @@ from backend.pipeline.youtube_fetcher import (
 from backend.ml.feature_engineering import (
     extract_title_features,
     parse_duration_category,
-    get_performance_label
+    compute_channel_thresholds,
+    get_performance_label,
+    video_age_days,
 )
 
 
@@ -56,12 +60,17 @@ def analyze_channel(identifier):
                 "error": "Not enough videos to analyze"
             }
         
-        # Step 3 - build dataframe
+        # Step 3 - build dataframe with age-corrected velocity
+        now = datetime.utcnow()
         rows = []
         for v in videos:
             if not v.view_count or v.view_count <= 0:
                 continue
-            
+
+            age_days = video_age_days(v.published_at, now=now)
+            if age_days is None:
+                continue
+
             day_of_week = -1
             hour_of_day = -1
             if v.published_at:
@@ -75,7 +84,8 @@ def analyze_channel(identifier):
                             v.published_at.hour
                 except Exception:
                     pass
-            
+
+            view_velocity = v.view_count / age_days
             rows.append({
                 "title": v.title or "",
                 "view_count": v.view_count,
@@ -86,21 +96,26 @@ def analyze_channel(identifier):
                 ),
                 "day_of_week": day_of_week,
                 "hour_of_day": hour_of_day,
-                "published_at": v.published_at
+                "published_at": v.published_at,
+                "age_days": age_days,
+                "view_velocity": view_velocity,
             })
-        
+
         df = pd.DataFrame(rows)
-        
+
         if len(df) == 0:
             return {"error": "No valid videos found"}
-        
-        # Step 4 - compute channel median
+
+        # Step 4 - percentile labels on view velocity; keep median on raw views
         median_views = df['view_count'].median()
+        thresholds = compute_channel_thresholds(
+            df['view_velocity'].tolist()
+        )
         df['performance_label'] = df[
-            'view_count'
+            'view_velocity'
         ].apply(
             lambda x: get_performance_label(
-                x, median_views
+                x, thresholds
             )
         )
         df['performance_ratio'] = df[

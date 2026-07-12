@@ -80,6 +80,10 @@ export function predictTitle(data) {
   return apiPost('/predict', data);
 }
 
+export function compareTitles(data) {
+  return apiPost('/compare', data);
+}
+
 export function fetchSimilar(data) {
   return apiPost('/similar', data);
 }

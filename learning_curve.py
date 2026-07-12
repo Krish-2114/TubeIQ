@@ -16,8 +16,12 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 from sklearn.metrics import accuracy_score
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import (
+    GroupShuffleSplit,
+    train_test_split,
+)
 from sklearn.preprocessing import LabelEncoder
 from xgboost import XGBClassifier
 
@@ -61,8 +65,9 @@ def load_niche_dataset(niche: str) -> pd.DataFrame | None:
 
 def time_series_split(df: pd.DataFrame):
     """
-    Mirror train_models.py: oldest 80% train, newest 20% test.
-    Rows are used in CSV order (chronological export order).
+    Mirror backend/ml/train_models.py:
+    Channel-based holdout split using GroupShuffleSplit on `channel_id`.
+    Falls back to stratified random split only when fewer than 4 unique channels exist.
     """
     X = df[FEATURE_COLUMNS].fillna(0)
     y_raw = df["performance_label"]
@@ -71,20 +76,35 @@ def time_series_split(df: pd.DataFrame):
     le.fit(["Low", "Medium", "High", "Viral"])
     y = le.transform(y_raw)
 
-    split_idx = int(len(df) * 0.8)
-    X_train = X.iloc[:split_idx]
-    X_test = X.iloc[split_idx:]
-    y_train = y[:split_idx]
-    y_test = y[split_idx:]
+    groups = df["channel_id"]
+    unique_channels = int(groups.nunique(dropna=True))
 
-    if len(X_test) < 10:
-        X_train, X_test, y_train, y_test = train_test_split(
-            X,
-            y,
+    if unique_channels < 4:
+        idx = np.arange(len(df))
+        train_idx, test_idx = train_test_split(
+            idx,
             test_size=0.2,
             random_state=42,
             stratify=y,
         )
+    else:
+        splitter = GroupShuffleSplit(
+            n_splits=1,
+            test_size=0.2,
+            random_state=42,
+        )
+        train_idx, test_idx = next(
+            splitter.split(X, y, groups=groups)
+        )
+
+    # Preserve chronological ordering within each fold.
+    train_idx = np.sort(train_idx)
+    test_idx = np.sort(test_idx)
+
+    X_train = X.iloc[train_idx]
+    X_test = X.iloc[test_idx]
+    y_train = y[train_idx]
+    y_test = y[test_idx]
 
     return X_train, X_test, y_train, y_test
 
