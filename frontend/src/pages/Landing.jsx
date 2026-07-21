@@ -32,12 +32,6 @@ const FEATURES = [
     desc: 'Identify underexplored topics with detailed niche gap reports.',
     link: '/gaps',
   },
-  {
-    num: '05',
-    title: 'Title Inspiration',
-    desc: 'See top-performing videos by keyword and similar hits to inspire your next title.',
-    link: '/improve',
-  },
 ];
 
 const EXAMPLE_CHANNELS = ['@mkbhd', '@MrBeast', '@CarryMinati', '@gordonramsay'];

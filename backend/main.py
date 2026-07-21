@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 import joblib
@@ -29,11 +30,6 @@ app.add_middleware(
 )
 
 
-class PredictRequest(BaseModel):
-    title: str
-    niche: str
-
-
 class CompareRequest(BaseModel):
     niche: str
     title_a: str
@@ -54,11 +50,6 @@ class ChannelAnalyzeRequest(BaseModel):
     identifier: str
 
 
-class ImproveTitleRequest(BaseModel):
-    title: str
-    niche: str
-
-
 def get_available_niches() -> list[str]:
     niches = []
     for path in MODELS_DIR.glob("tfidf_*.pkl"):
@@ -77,10 +68,24 @@ def _model_path(name: str) -> Path:
     return MODELS_DIR / name
 
 
+def struct_features(title: str) -> dict:
+    title = title or ""
+    return {
+        "title_length": len(title),
+        "has_number": int(bool(re.search(r"\d", title))),
+        "has_question": int("?" in title),
+    }
+
+
 def _require_niche(niche: str) -> None:
     model_path = _model_path(f"tfidf_{niche}.pkl")
     ref_path = _model_path(f"reference_set_{niche}.pkl")
-    if not model_path.exists() or not ref_path.exists():
+    blend_path = _model_path(f"blend_{niche}.pkl")
+    if (
+        not model_path.exists()
+        or not ref_path.exists()
+        or not blend_path.exists()
+    ):
         raise HTTPException(
             status_code=404,
             detail=f"No trained model found for niche '{niche}'",
@@ -115,15 +120,17 @@ def load_reference_set(niche: str):
     )
 
 
-def load_all_vecs(niche: str):
-    """Precompute TF-IDF vectors for every title in the niche CSV."""
-    def loader():
-        tfidf = load_tfidf(niche)
-        df = load_niche_csv(niche)
-        titles = df["title"].fillna("").tolist()
-        return tfidf.transform(titles)
-
-    return _cache_get(f"all_vecs_{niche}", loader)
+def load_blend(niche: str):
+    path = _model_path(f"blend_{niche}.pkl")
+    if not path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"No blend model found for niche '{niche}'",
+        )
+    return _cache_get(
+        f"blend_{niche}",
+        lambda: joblib.load(path),
+    )
 
 
 def load_kmeans(niche: str):
@@ -195,33 +202,13 @@ def root():
     return {"message": "TubeIQ API is running"}
 
 
-@app.post("/predict")
-def predict_title(req: PredictRequest):
-    _require_niche(req.niche)
-
-    tfidf = load_tfidf(req.niche)
-    ref = load_reference_set(req.niche)
-    all_vecs = load_all_vecs(req.niche)
-
-    vec = tfidf.transform([req.title])
-    score = float(cosine_similarity(vec, ref["vectors"]).mean())
-    all_scores = cosine_similarity(
-        all_vecs, ref["vectors"]
-    ).mean(axis=1)
-    percentile = float((all_scores < score).mean() * 100)
-
-    return {
-        "score": score,
-        "percentile": percentile,
-    }
-
-
 @app.post("/compare")
 def compare_titles(req: CompareRequest):
     _require_niche(req.niche)
 
     tfidf = load_tfidf(req.niche)
     ref = load_reference_set(req.niche)
+    blend = load_blend(req.niche)
 
     vec_a = tfidf.transform([req.title_a])
     vec_b = tfidf.transform([req.title_b])
@@ -232,11 +219,25 @@ def compare_titles(req: CompareRequest):
         cosine_similarity(vec_b, ref["vectors"]).mean()
     )
 
-    winner = "title_a" if score_a > score_b else "title_b"
+    feats_a = struct_features(req.title_a)
+    feats_b = struct_features(req.title_b)
+    x = [[
+        score_b - score_a,
+        feats_b["has_number"] - feats_a["has_number"],
+        feats_b["has_question"] - feats_a["has_question"],
+        feats_b["title_length"] - feats_a["title_length"],
+    ]]
+    x_scaled = blend["scaler"].transform(x)
+    pred = blend["model"].predict(x_scaled)[0]
+    proba = blend["model"].predict_proba(x_scaled)[0]
+    winner = "title_b" if pred == 1 else "title_a"
+    confidence = round(float(max(proba)), 4)
+
     return {
         "winner": winner,
         "title_a_score": score_a,
         "title_b_score": score_b,
+        "confidence": confidence,
     }
 
 
@@ -355,21 +356,6 @@ def channel_analyze(body: ChannelAnalyzeRequest):
         )
 
     result = analyze_channel(identifier)
-    if "error" in result:
-        raise HTTPException(status_code=400, detail=result["error"])
-    return result
-
-
-@app.post("/improve")
-def improve_title_endpoint(body: ImproveTitleRequest):
-    from backend.ml.title_improver import improve_title
-
-    title = body.title.strip()
-    if not title:
-        raise HTTPException(status_code=400, detail="Title is required")
-
-    _require_niche(body.niche)
-    result = improve_title(title, body.niche)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result

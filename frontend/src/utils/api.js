@@ -76,10 +76,6 @@ export function fetchInsights(niche) {
   return apiGet(`/insights/${niche}`);
 }
 
-export function predictTitle(data) {
-  return apiPost('/predict', data);
-}
-
 export function compareTitles(data) {
   return apiPost('/compare', data);
 }
@@ -94,10 +90,6 @@ export function fetchGaps(niche) {
 
 export function analyzeChannel(identifier) {
   return apiPost('/channel/analyze', { identifier: identifier.trim() });
-}
-
-export function improveTitle(title, niche) {
-  return apiPost('/improve', { title: title.trim(), niche });
 }
 
 export function formatDuration(seconds) {

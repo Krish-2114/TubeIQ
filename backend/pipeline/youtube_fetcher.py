@@ -9,42 +9,71 @@ from backend.config import YOUTUBE_API_KEY
 YOUTUBE_BASE_URL = "https://www.googleapis.com/youtube/v3"
 
 TRAINING_CHANNELS = {
+    # Reconciled against DB custom_url / channel_title, then expanded
+    # for LOCO diversity (education prioritized; cooking/fitness unchanged).
     "gaming": [
         "@CarryMinati",
         "@TechnoGamerzOfficial",
-        "@IShowSpeed"
+        "@IShowSpeed",
+        "@GyanGaming",
+        "@Markiplier",
+        "@PewDiePie",
+        "@jacksepticeye",
+        "@VanossGaming",  # multiplayer comedy-montage (new)
     ],
     "entertainment": [
         "@MrBeast",
         "@DudePerfect",
-        "@FazeRug",
-        "@KSI"
+        "@rug",  # FaZe Rug
+        "@KSI",
+        "@loganpaulvlogs",  # Logan Paul Vlogs (corrected)
+        "@Airrack",  # short-form challenge/experiment
+        "@ZHCYT",  # Zach Hsieh / ZHC art challenges (corrected)
+        "@ryan",  # Ryan Trahan endurance/challenge docs
+        "@emmachamberlain",  # Emma Chamberlain low-key vlogs
     ],
     "cooking": [
         "@gordonramsay",
         "@bingingwithbabish",
-        "@ChefRanveer",
+        "@ranveerbrar",  # Chef Ranveer Brar
         "@nickdigiovanni",
-        "@SortedFood"
+        "@SortedFood",
+        "@joshuaweissman",
+        "@buzzfeedtasty",  # Tasty
     ],
     "tech": [
         "@mkbhd",
         "@LinusTechTips",
-        "@Mrwhosetheboss"
+        "@Mrwhosetheboss",
+        "@unboxtherapy",  # unboxing-first (new)
+        "@JerryRigEverything",  # durability/teardown (new)
+        "@Dave2D",  # short aesthetic reviews (new)
     ],
     "finance": [
         "@GrahamStephan",
         "@AndreiJikh",
-        "@CARachanaRanade"
+        "@CARachanaRanade",
+        "@warikoo",  # Indian career-and-finance (new)
+        "@MeetKevin",  # real estate/stocks hot takes (new)
     ],
     "education": [
         "@kurzgesagt",
-        "@veritasium"
+        "@veritasium",
+        "@Vsauce",  # philosophical essay / live-action (new)
+        "@TEDEd",  # short curriculum animated lessons (new)
+        "@CGPGrey",  # minimalist maps/diagram essays (new)
+        "@SmarterEveryDay",  # hands-on experiment format (new)
     ],
     "fitness": [
         "@JeffNippard",
-        "@ATHLEANXReal"
-    ]
+        "@athleanx",  # ATHLEAN-X™
+    ],
+    "streaming": [
+        "@Ludwig",
+        "@Pokimane",
+        "@penguinz0",
+        "@xqcow",  # xQc
+    ],
 }
 
 

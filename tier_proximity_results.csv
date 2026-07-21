@@ -1,9 +1,0 @@
-niche,exact_accuracy,top2_accuracy,offbyone_accuracy
-gaming,37.14,74.29,59.64
-entertainment,44.38,83.75,51.25
-cooking,34.29,75.0,60.0
-finance,31.67,66.67,56.67
-fitness,32.5,68.75,62.5
-education,42.5,71.25,63.75
-tech,41.67,75.0,55.0
-streaming,39.29,75.0,61.43

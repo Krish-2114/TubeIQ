@@ -11,7 +11,6 @@ export default function Footer() {
         <p className="text-sm text-muted">YouTube channel growth intelligence.</p>
         <div className="flex flex-wrap gap-6 justify-center">
           <Link to="/analyze" className="nav-link text-sm">Analyzer</Link>
-          <Link to="/improve" className="nav-link text-sm">Inspiration</Link>
           <Link to="/insights" className="nav-link text-sm">Insights</Link>
           <Link to="/channel" className="nav-link text-sm">Channel</Link>
           <Link to="/gaps" className="nav-link text-sm">Content Gaps</Link>
