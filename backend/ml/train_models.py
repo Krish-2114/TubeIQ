@@ -46,16 +46,19 @@ MIN_VIEW_RATIO = 2.0
 MAX_AGE_GAP_DAYS = 120
 MIN_BLEND_PAIRS = 200
 
-# LOCO blend−duration accuracies (age-gap fixed) for sanity flags
-LOCO_BLEND_ACC = {
-    "gaming": 0.534,
-    "entertainment": 0.542,
-    "cooking": 0.609,
-    "finance": 0.634,
-    "fitness": 0.578,
-    "education": 0.547,
-    "tech": 0.586,
-    "streaming": 0.604,
+# Held-out accuracies from blend_eval.py (random 80/20 over pooled pairs, with
+# pair orientation balanced so 50% is the baseline). Used only as sanity flags:
+# production trains on every channel, so its own training accuracy is not an
+# honest performance estimate. Re-run blend_eval.py if these drift.
+EVAL_BLEND_ACC = {
+    "gaming": 0.553,
+    "entertainment": 0.588,
+    "cooking": 0.625,
+    "finance": 0.552,
+    "fitness": 0.639,
+    "education": 0.576,
+    "tech": 0.589,
+    "streaming": 0.691,
 }
 
 os.makedirs("backend/saved_models", exist_ok=True)
@@ -154,8 +157,20 @@ def train_tfidf_for_niche(df, niche):
         ['High', 'Viral']
     )
     reference_rows = df.loc[
-        high_viral_mask, ['title', 'video_id']
-    ].fillna('')
+        high_viral_mask,
+        [
+            'title',
+            'video_id',
+            'channel_title',
+            'view_count',
+            'performance_label',
+        ],
+    ].copy()
+    reference_rows['title'] = reference_rows['title'].fillna('')
+    reference_rows['video_id'] = reference_rows['video_id'].fillna('')
+    reference_rows['channel_title'] = (
+        reference_rows['channel_title'].fillna('')
+    )
     reference_titles = reference_rows['title'].tolist()
     reference_video_ids = reference_rows['video_id'].tolist()
     if reference_titles:
@@ -165,6 +180,15 @@ def train_tfidf_for_niche(df, niche):
                 'titles': reference_titles,
                 'video_ids': reference_video_ids,
                 'vectors': reference_vecs,
+                'channel_titles': (
+                    reference_rows['channel_title'].tolist()
+                ),
+                'view_counts': (
+                    reference_rows['view_count'].tolist()
+                ),
+                'performance_labels': (
+                    reference_rows['performance_label'].tolist()
+                ),
             },
             f"backend/saved_models/"
             f"reference_set_{niche}.pkl"
@@ -253,6 +277,69 @@ def train_kmeans_for_niche(df, niche, n_clusters=6):
         json.dump(cluster_keywords, f, indent=2)
 
     return kmeans, cluster_keywords
+
+
+def compute_and_save_gaps(df, niche, tfidf, kmeans, cluster_keywords):
+    """Precompute content-gap rankings and write gaps_{niche}.csv."""
+    print(f"\n  Computing gaps for {niche}...")
+
+    work = df.copy()
+    cleaned_titles = work.apply(
+        lambda row: clean_title(
+            row.get("title", ""),
+            row.get("channel_title", ""),
+        ),
+        axis=1,
+    )
+    vectors = tfidf.transform(cleaned_titles.fillna("").tolist())
+    cluster_labels = kmeans.predict(vectors)
+    work["cluster_id"] = cluster_labels
+
+    cluster_avgs = (
+        work.groupby("cluster_id")["view_count"]
+        .mean()
+        .to_dict()
+    )
+    overall_avg = float(np.mean(list(cluster_avgs.values())))
+
+    gap_rows = []
+    for cluster_id, avg_views in cluster_avgs.items():
+        if avg_views >= overall_avg:
+            continue
+
+        opportunity_score = round(
+            float((overall_avg - avg_views) / max(overall_avg, 1)),
+            4,
+        )
+        keywords = (
+            cluster_keywords.get(cluster_id)
+            or cluster_keywords.get(str(cluster_id), [])
+        )
+        gap_rows.append({
+            "cluster_id": int(cluster_id),
+            "keywords": ";".join(keywords),
+            "avg_views": round(float(avg_views), 2),
+            "opportunity_score": opportunity_score,
+        })
+
+    gap_rows.sort(
+        key=lambda item: item["opportunity_score"],
+        reverse=True,
+    )
+
+    out_path = f"backend/saved_models/gaps_{niche}.csv"
+    pd.DataFrame(
+        gap_rows,
+        columns=[
+            "cluster_id",
+            "keywords",
+            "avg_views",
+            "opportunity_score",
+        ],
+    ).to_csv(out_path, index=False)
+
+    print(f"  Gaps saved: {len(gap_rows)} clusters → {out_path}")
+    return gap_rows
 
 
 def _inline_title_feats(title: str) -> dict:
@@ -419,31 +506,32 @@ def train_blend_for_niche(df, niche, tfidf=None):
     for name, coef in coefs.items():
         print(f"    {name}: {coef:+.4f}")
 
-    loco = LOCO_BLEND_ACC.get(niche)
-    if loco is not None:
-        delta_pp = (train_acc - loco) * 100
+    held_out = EVAL_BLEND_ACC.get(niche)
+    if held_out is not None:
+        delta_pp = (train_acc - held_out) * 100
         if train_acc >= 0.95:
             print(
                 f"  FLAG: training accuracy {train_acc * 100:.1f}% is "
-                f"near 100% (possible overfitting vs LOCO "
-                f"{loco * 100:.1f}%)"
+                f"near 100% (possible overfitting vs held-out "
+                f"{held_out * 100:.1f}%)"
             )
         elif train_acc <= 0.52:
             print(
                 f"  FLAG: training accuracy {train_acc * 100:.1f}% is "
                 f"near chance — something may be broken "
-                f"(LOCO was {loco * 100:.1f}%)"
+                f"(held-out was {held_out * 100:.1f}%)"
             )
         elif abs(delta_pp) > 20:
             print(
-                f"  FLAG: training accuracy differs from LOCO by "
+                f"  FLAG: training accuracy differs from held-out by "
                 f"{delta_pp:+.1f}pp "
-                f"(train {train_acc * 100:.1f}% vs LOCO {loco * 100:.1f}%)"
+                f"(train {train_acc * 100:.1f}% vs "
+                f"held-out {held_out * 100:.1f}%)"
             )
         else:
             print(
-                f"  Sanity vs LOCO: train {train_acc * 100:.1f}% vs "
-                f"LOCO {loco * 100:.1f}% ({delta_pp:+.1f}pp)"
+                f"  Sanity vs held-out: train {train_acc * 100:.1f}% vs "
+                f"{held_out * 100:.1f}% ({delta_pp:+.1f}pp)"
             )
 
     return {
@@ -451,7 +539,7 @@ def train_blend_for_niche(df, niche, tfidf=None):
         "num_pairs": len(pairs),
         "coefficients": coefs,
         "train_accuracy": round(train_acc, 4),
-        "loco_accuracy": loco,
+        "held_out_accuracy": held_out,
     }
 
 
@@ -483,7 +571,12 @@ def train_all_models():
 
         # Train K-Means
         if tfidf:
-            train_kmeans_for_niche(df, niche)
+            kmeans_result = train_kmeans_for_niche(df, niche)
+            if kmeans_result:
+                kmeans, cluster_keywords = kmeans_result
+                compute_and_save_gaps(
+                    df, niche, tfidf, kmeans, cluster_keywords
+                )
             trained.append(niche)
 
             # Production blend on all channels

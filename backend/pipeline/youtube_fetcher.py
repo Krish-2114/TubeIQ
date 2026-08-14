@@ -9,8 +9,8 @@ from backend.config import YOUTUBE_API_KEY
 YOUTUBE_BASE_URL = "https://www.googleapis.com/youtube/v3"
 
 TRAINING_CHANNELS = {
-    # Reconciled against DB custom_url / channel_title, then expanded
-    # for LOCO diversity (education prioritized; cooking/fitness unchanged).
+    # Reconciled against DB custom_url / channel_title, then expanded for
+    # channel diversity (education prioritized; cooking/fitness unchanged).
     "gaming": [
         "@CarryMinati",
         "@TechnoGamerzOfficial",
