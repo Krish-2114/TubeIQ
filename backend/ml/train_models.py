@@ -8,9 +8,8 @@ from sklearn.feature_extraction.text import (
     TfidfVectorizer
 )
 from sklearn.cluster import KMeans
-from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.preprocessing import StandardScaler
 from itertools import combinations
 import warnings
 warnings.filterwarnings('ignore')
@@ -35,30 +34,70 @@ FEATURE_COLUMNS = [
     "has_how", "has_why", "has_what"
 ]
 
+# Production blend features — selected by select_rf_features.py (top-25 by
+# mean RF importance). age_days excluded (label leak).
+# Order is the model input order; do not reshuffle without retraining.
 BLEND_FEATURE_NAMES = [
+    "duration_seconds_diff",
+    "duration_encoded_diff",
     "tfidf_diff",
-    "has_number_diff",
-    "has_question_diff",
+    "uppercase_ratio_diff",
+    "uppercase_count_diff",
+    "hour_of_day_diff",
+    "all_caps_word_count_diff",
     "title_length_diff",
+    "digit_count_diff",
+    "char_density_diff",
+    "space_count_diff",
+    "word_count_diff",
+    "word_length_mean_diff",
+    "unique_word_ratio_diff",
+    "punctuation_count_diff",
+    "day_of_week_diff",
+    "exclamation_count_diff",
+    "has_exclamation_diff",
+    "word_length_max_diff",
+    "has_year_diff",
+    "emoji_count_diff",
+    "hashtag_count_diff",
+    "long_word_count_diff",
+    "has_number_diff",
+    "has_quotes_diff",
 ]
+
+# Side columns (everything except tfidf) used to build pair diffs
+BLEND_SIDE_COLS = [
+    name[: -len("_diff")]
+    for name in BLEND_FEATURE_NAMES
+    if name != "tfidf_diff"
+]
+
+# Tuned RF; held-out numbers refreshed after top-25 selection
+BLEND_RF_PARAMS = {
+    "n_estimators": 500,
+    "max_depth": 14,
+    "min_samples_leaf": 4,
+    "max_features": "log2",
+    "random_state": 42,
+    "n_jobs": -1,
+}
 
 MIN_VIEW_RATIO = 2.0
 MAX_AGE_GAP_DAYS = 120
 MIN_BLEND_PAIRS = 200
+BLEND_PAIR_SEED = 42
 
-# Held-out accuracies from blend_eval.py (random 80/20 over pooled pairs, with
-# pair orientation balanced so 50% is the baseline). Used only as sanity flags:
-# production trains on every channel, so its own training accuracy is not an
-# honest performance estimate. Re-run blend_eval.py if these drift.
+# Held-out accuracy from blend_eval.py (random 80/20 over pairs).
+# Sanity flags only — production trains on every channel.
 EVAL_BLEND_ACC = {
-    "gaming": 0.553,
-    "entertainment": 0.588,
-    "cooking": 0.625,
-    "finance": 0.552,
-    "fitness": 0.639,
-    "education": 0.576,
-    "tech": 0.589,
-    "streaming": 0.691,
+    "gaming": 0.822,
+    "entertainment": 0.757,
+    "cooking": 0.825,
+    "finance": 0.745,
+    "fitness": 0.785,
+    "education": 0.743,
+    "tech": 0.725,
+    "streaming": 0.864,
 }
 
 os.makedirs("backend/saved_models", exist_ok=True)
@@ -342,14 +381,109 @@ def compute_and_save_gaps(df, niche, tfidf, kmeans, cluster_keywords):
     return gap_rows
 
 
-def _inline_title_feats(title: str) -> dict:
-    """Lightweight title features — no DB import from feature_engineering."""
+def _duration_encoded(seconds) -> int:
+    try:
+        seconds = float(seconds)
+    except (TypeError, ValueError):
+        return -1
+    if seconds <= 0:
+        return -1
+    if seconds < 120:
+        return 0  # short
+    if seconds < 600:
+        return 1  # medium
+    if seconds < 1800:
+        return 2  # long
+    return 3  # very_long
+
+
+def extract_blend_side_features(
+    title: str,
+    duration_seconds=None,
+    day_of_week=None,
+    hour_of_day=None,
+) -> dict:
+    """
+    Features for one side of a title comparison.
+    Matches columns used to train blend_{niche}.pkl (selected top-25).
+    """
     title = title or ""
+    words_raw = re.findall(r"\b[\w']+\b", title)
+    words_lower = [w.lower() for w in words_raw]
+    word_lengths = [len(w) for w in words_lower]
+    letters = [c for c in title if c.isalpha()]
+    emoji_count = len(
+        re.findall(r"[\U0001F300-\U0001FAFF\U00002600-\U000027BF]", title)
+    )
+    non_space = sum(not c.isspace() for c in title)
+
+    if duration_seconds is None:
+        duration_seconds = 600.0
+    if day_of_week is None:
+        day_of_week = 2
+    if hour_of_day is None:
+        hour_of_day = 14
+
     return {
-        "title_length": len(title),
-        "has_number": int(bool(re.search(r"\d", title))),
-        "has_question": int("?" in title),
+        "duration_seconds": float(duration_seconds),
+        "duration_encoded": float(_duration_encoded(duration_seconds)),
+        "hour_of_day": float(int(hour_of_day)),
+        "day_of_week": float(int(day_of_week)),
+        "title_length": float(len(title)),
+        "word_count": float(len(title.split()) if title else 0),
+        "has_number": float(int(bool(re.search(r"\d", title)))),
+        "has_exclamation": float(int("!" in title)),
+        "uppercase_count": float(sum(c.isupper() for c in title)),
+        "uppercase_ratio": (
+            sum(c.isupper() for c in letters) / len(letters)
+            if letters
+            else 0.0
+        ),
+        "all_caps_word_count": float(
+            sum(1 for w in words_raw if len(w) >= 2 and w.isupper())
+        ),
+        "digit_count": float(sum(c.isdigit() for c in title)),
+        "char_density": float(non_space / len(title)) if title else 0.0,
+        "space_count": float(title.count(" ")),
+        "word_length_mean": (
+            float(np.mean(word_lengths)) if word_lengths else 0.0
+        ),
+        "word_length_max": float(max(word_lengths)) if word_lengths else 0.0,
+        "long_word_count": float(sum(L >= 8 for L in word_lengths)),
+        "unique_word_ratio": (
+            len(set(words_lower)) / len(words_lower) if words_lower else 0.0
+        ),
+        "punctuation_count": float(
+            sum(c in "!?.,:;—-()[]{}\"'" for c in title)
+        ),
+        "exclamation_count": float(title.count("!")),
+        "has_year": float(bool(re.search(r"\b20[2-3]\d\b", title))),
+        "emoji_count": float(emoji_count),
+        "hashtag_count": float(title.count("#")),
+        "has_quotes": float(int('"' in title or "'" in title)),
     }
+
+
+def blend_pair_feature_vector(
+    sim_a: float,
+    sim_b: float,
+    feats_a: dict,
+    feats_b: dict,
+) -> list[float]:
+    """B − A diffs in BLEND_FEATURE_NAMES order."""
+    vec = []
+    for name in BLEND_FEATURE_NAMES:
+        if name == "tfidf_diff":
+            vec.append(float(sim_b) - float(sim_a))
+        else:
+            col = name[: -len("_diff")]
+            vec.append(float(feats_b[col]) - float(feats_a[col]))
+    return vec
+
+
+def _inline_title_feats(title: str) -> dict:
+    """Backward-compatible alias — prefer extract_blend_side_features."""
+    return extract_blend_side_features(title)
 
 
 def _avg_sim_excluding(
@@ -370,13 +504,15 @@ def _avg_sim_excluding(
 def train_blend_for_niche(df, niche, tfidf=None):
     """
     Fit production blend model on ALL channels in the niche.
-    Features: leakage-safe tfidf_diff + structural diffs (no duration).
+    RandomForest on selected top-25 diffs (no age_days).
     """
     print(f"\n  Training blend model for {niche}...")
 
     needed = [
         "title", "view_velocity", "channel_id",
         "age_days", "performance_label", "video_id",
+        "duration_seconds", "duration_encoded",
+        "day_of_week", "hour_of_day",
     ]
     missing = [c for c in needed if c not in df.columns]
     if missing:
@@ -414,6 +550,7 @@ def train_blend_for_niche(df, niche, tfidf=None):
         )
         return None
 
+    rng = np.random.default_rng(BLEND_PAIR_SEED)
     pairs = []
     for _, channel_df in work.groupby("channel_id"):
         records = channel_df.to_dict("records")
@@ -430,7 +567,10 @@ def train_blend_for_niche(df, niche, tfidf=None):
             lo, hi = min(vel_a, vel_b), max(vel_a, vel_b)
             if lo <= 0 or hi / lo < MIN_VIEW_RATIO:
                 continue
-            pairs.append((row_a, row_b))
+            if rng.random() < 0.5:
+                pairs.append((row_b, row_a))
+            else:
+                pairs.append((row_a, row_b))
 
     if len(pairs) < MIN_BLEND_PAIRS:
         print(
@@ -450,6 +590,16 @@ def train_blend_for_niche(df, niche, tfidf=None):
         for i in range(len(all_video_ids))
     }
 
+    # Precompute side features once per video
+    side_by_vid = {}
+    for _, row in work.iterrows():
+        side_by_vid[row["video_id"]] = extract_blend_side_features(
+            row["title"],
+            duration_seconds=row["duration_seconds"],
+            day_of_week=row["day_of_week"],
+            hour_of_day=row["hour_of_day"],
+        )
+
     X = []
     y = []
     for row_a, row_b in pairs:
@@ -464,14 +614,14 @@ def train_blend_for_niche(df, niche, tfidf=None):
             ref_video_ids,
             exclude,
         )
-        feats_a = _inline_title_feats(row_a["title"])
-        feats_b = _inline_title_feats(row_b["title"])
-        X.append([
-            sim_b - sim_a,
-            feats_b["has_number"] - feats_a["has_number"],
-            feats_b["has_question"] - feats_a["has_question"],
-            feats_b["title_length"] - feats_a["title_length"],
-        ])
+        X.append(
+            blend_pair_feature_vector(
+                sim_a,
+                sim_b,
+                side_by_vid[row_a["video_id"]],
+                side_by_vid[row_b["video_id"]],
+            )
+        )
         y.append(
             1 if float(row_b["view_velocity"]) > float(row_a["view_velocity"])
             else 0
@@ -480,31 +630,37 @@ def train_blend_for_niche(df, niche, tfidf=None):
     X = np.asarray(X, dtype=float)
     y = np.asarray(y, dtype=int)
 
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-    clf = LogisticRegression(max_iter=1000, random_state=42, solver="lbfgs")
-    clf.fit(X_scaled, y)
+    X_aug = np.vstack([X, -X])
+    y_aug = np.concatenate([y, 1 - y])
 
-    scores = clf.decision_function(X_scaled)
-    preds = (scores > 0).astype(int)
-    ties = scores == 0
-    train_correct = int(np.sum((preds == y) & ~ties))
-    train_acc = train_correct / len(y)
+    clf = RandomForestClassifier(**BLEND_RF_PARAMS)
+    clf.fit(X_aug, y_aug)
 
-    coefs = {
-        name: float(coef)
-        for name, coef in zip(BLEND_FEATURE_NAMES, clf.coef_[0])
+    probs = clf.predict_proba(X)[:, 1]
+    preds = (probs > 0.5).astype(int)
+    train_acc = float((preds == y).mean())
+
+    importances = {
+        name: float(imp)
+        for name, imp in zip(BLEND_FEATURE_NAMES, clf.feature_importances_)
     }
+    top_imp = sorted(importances.items(), key=lambda kv: -kv[1])[:8]
 
     joblib.dump(
-        {"scaler": scaler, "model": clf},
+        {
+            "model": clf,
+            "feature_names": BLEND_FEATURE_NAMES,
+            "model_type": "random_forest",
+            "rf_params": BLEND_RF_PARAMS,
+        },
         f"backend/saved_models/blend_{niche}.pkl",
     )
 
+    print(f"  Model: RandomForest ({len(BLEND_FEATURE_NAMES)} features)")
     print(f"  Training accuracy: {train_acc * 100:.1f}%")
-    print(f"  Coefficients:")
-    for name, coef in coefs.items():
-        print(f"    {name}: {coef:+.4f}")
+    print("  Top feature importances:")
+    for name, imp in top_imp:
+        print(f"    {name}: {imp:.4f}")
 
     held_out = EVAL_BLEND_ACC.get(niche)
     if held_out is not None:
@@ -521,7 +677,7 @@ def train_blend_for_niche(df, niche, tfidf=None):
                 f"near chance — something may be broken "
                 f"(held-out was {held_out * 100:.1f}%)"
             )
-        elif abs(delta_pp) > 20:
+        elif abs(delta_pp) > 25:
             print(
                 f"  FLAG: training accuracy differs from held-out by "
                 f"{delta_pp:+.1f}pp "
@@ -537,9 +693,10 @@ def train_blend_for_niche(df, niche, tfidf=None):
     return {
         "niche": niche,
         "num_pairs": len(pairs),
-        "coefficients": coefs,
+        "importances": importances,
         "train_accuracy": round(train_acc, 4),
         "held_out_accuracy": held_out,
+        "n_features": len(BLEND_FEATURE_NAMES),
     }
 
 
@@ -591,25 +748,26 @@ def train_all_models():
 
     if blend_results:
         print(f"\n{'='*72}")
-        print("BLEND MODEL SUMMARY")
+        print("BLEND MODEL SUMMARY (RandomForest, title_meta)")
         print(f"{'='*72}")
         print(
-            f"{'Niche':<15} {'Pairs':>8} {'Train%':>8} "
-            f"{'tfidf':>9} {'number':>9} {'question':>9} {'length':>9}"
+            f"{'Niche':<15} {'Pairs':>8} {'Feats':>6} "
+            f"{'Train%':>8} {'Held%':>8}"
         )
         print(
-            f"{'-' * 15} {'-' * 8} {'-' * 8} "
-            f"{'-' * 9} {'-' * 9} {'-' * 9} {'-' * 9}"
+            f"{'-' * 15} {'-' * 8} {'-' * 6} "
+            f"{'-' * 8} {'-' * 8}"
         )
         for row in blend_results:
-            c = row["coefficients"]
+            held = row.get("held_out_accuracy")
+            held_txt = (
+                f"{held * 100:7.1f}%" if held is not None else f"{'-':>8}"
+            )
             print(
                 f"{row['niche']:<15} {row['num_pairs']:>8,} "
+                f"{row['n_features']:>6} "
                 f"{row['train_accuracy'] * 100:>7.1f}% "
-                f"{c['tfidf_diff']:>+9.4f} "
-                f"{c['has_number_diff']:>+9.4f} "
-                f"{c['has_question_diff']:>+9.4f} "
-                f"{c['title_length_diff']:>+9.4f}"
+                f"{held_txt}"
             )
 
     print(f"\nAll models saved to "

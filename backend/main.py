@@ -1,16 +1,19 @@
 import json
 import re
 from pathlib import Path
+from typing import Optional
 
 import joblib
-import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sklearn.metrics.pairwise import cosine_similarity
 
-from backend.ml.train_models import clean_title
+from backend.ml.train_models import (
+    blend_pair_feature_vector,
+    extract_blend_side_features,
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 MODELS_DIR = BASE_DIR / "saved_models"
@@ -34,6 +37,13 @@ class CompareRequest(BaseModel):
     niche: str
     title_a: str
     title_b: str
+    # Optional pre-publish metadata — defaults keep title-only compares working
+    duration_seconds_a: Optional[float] = Field(default=None)
+    duration_seconds_b: Optional[float] = Field(default=None)
+    day_of_week_a: Optional[int] = Field(default=None, ge=0, le=6)
+    day_of_week_b: Optional[int] = Field(default=None, ge=0, le=6)
+    hour_of_day_a: Optional[int] = Field(default=None, ge=0, le=23)
+    hour_of_day_b: Optional[int] = Field(default=None, ge=0, le=23)
 
 
 class SimilarRequest(BaseModel):
@@ -64,17 +74,19 @@ def _cache_get(key: str, loader):
     return _cache[key]
 
 
+def _clear_cache() -> int:
+    n = len(_cache)
+    _cache.clear()
+    return n
+
+
 def _model_path(name: str) -> Path:
     return MODELS_DIR / name
 
 
 def struct_features(title: str) -> dict:
-    title = title or ""
-    return {
-        "title_length": len(title),
-        "has_number": int(bool(re.search(r"\d", title))),
-        "has_question": int("?" in title),
-    }
+    """Deprecated alias — use extract_blend_side_features."""
+    return extract_blend_side_features(title)
 
 
 def _require_niche(niche: str) -> None:
@@ -189,6 +201,83 @@ def load_insights(niche: str) -> dict:
     return _cache_get(f"insights_{niche}", loader)
 
 
+def load_gaps_csv(niche: str) -> list:
+    path = MODELS_DIR / f"gaps_{niche}.csv"
+    if not path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"No gaps data found for niche '{niche}'",
+        )
+
+    def loader():
+        df = pd.read_csv(path)
+        results = []
+        for _, row in df.iterrows():
+            raw_keywords = row.get("keywords", "")
+            if pd.isna(raw_keywords) or str(raw_keywords).strip() == "":
+                keywords = []
+            else:
+                keywords = [
+                    k for k in str(raw_keywords).split(";") if k
+                ]
+            results.append({
+                "cluster_id": int(row["cluster_id"]),
+                "keywords": keywords,
+                "avg_views": float(row["avg_views"]),
+                "opportunity_score": float(row["opportunity_score"]),
+            })
+        return results
+
+    return _cache_get(f"gaps_{niche}", loader)
+
+
+def _reference_metadata(niche: str, ref: dict) -> tuple[list, list, list]:
+    """channel / views / label aligned to reference rows."""
+    n = len(ref.get("titles") or [])
+    channels = ref.get("channel_titles")
+    views = ref.get("view_counts")
+    labels = ref.get("performance_labels")
+    if (
+        channels is not None
+        and views is not None
+        and labels is not None
+        and len(channels) == n
+        and len(views) == n
+        and len(labels) == n
+    ):
+        return list(channels), list(views), list(labels)
+
+    video_ids = ref.get("video_ids") or []
+    if len(video_ids) != n:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"reference_set_{niche}.pkl missing metadata "
+                f"and video_ids length mismatch"
+            ),
+        )
+
+    df = load_niche_csv(niche)
+    by_id = {
+        str(row["video_id"]): row
+        for _, row in df.iterrows()
+    }
+    channels_out = []
+    views_out = []
+    labels_out = []
+    for vid in video_ids:
+        row = by_id.get(str(vid))
+        if row is None:
+            channels_out.append("")
+            views_out.append(0)
+            labels_out.append("")
+        else:
+            channels_out.append(row.get("channel_title", "") or "")
+            views_out.append(row["view_count"])
+            labels_out.append(row["performance_label"])
+    return channels_out, views_out, labels_out
+
+
 @app.get("/health")
 def health():
     return {
@@ -200,6 +289,12 @@ def health():
 @app.get("/")
 def root():
     return {"message": "TubeIQ API is running"}
+
+
+@app.post("/admin/clear-cache")
+def clear_cache():
+    cleared = _clear_cache()
+    return {"status": "ok", "cleared_entries": cleared}
 
 
 @app.post("/compare")
@@ -219,17 +314,31 @@ def compare_titles(req: CompareRequest):
         cosine_similarity(vec_b, ref["vectors"]).mean()
     )
 
-    feats_a = struct_features(req.title_a)
-    feats_b = struct_features(req.title_b)
-    x = [[
-        score_b - score_a,
-        feats_b["has_number"] - feats_a["has_number"],
-        feats_b["has_question"] - feats_a["has_question"],
-        feats_b["title_length"] - feats_a["title_length"],
-    ]]
-    x_scaled = blend["scaler"].transform(x)
-    pred = blend["model"].predict(x_scaled)[0]
-    proba = blend["model"].predict_proba(x_scaled)[0]
+    feats_a = extract_blend_side_features(
+        req.title_a,
+        duration_seconds=req.duration_seconds_a,
+        day_of_week=req.day_of_week_a,
+        hour_of_day=req.hour_of_day_a,
+    )
+    feats_b = extract_blend_side_features(
+        req.title_b,
+        duration_seconds=req.duration_seconds_b,
+        day_of_week=req.day_of_week_b,
+        hour_of_day=req.hour_of_day_b,
+    )
+    x = [
+        blend_pair_feature_vector(
+            score_a, score_b, feats_a, feats_b
+        )
+    ]
+
+    model = blend["model"]
+    # Legacy pickles used a StandardScaler; new RF pickles do not
+    if "scaler" in blend and blend["scaler"] is not None:
+        x = blend["scaler"].transform(x)
+
+    pred = model.predict(x)[0]
+    proba = model.predict_proba(x)[0]
     winner = "title_b" if pred == 1 else "title_a"
     confidence = round(float(max(proba)), 4)
 
@@ -238,6 +347,7 @@ def compare_titles(req: CompareRequest):
         "title_a_score": score_a,
         "title_b_score": score_b,
         "confidence": confidence,
+        "model_type": blend.get("model_type", "unknown"),
     }
 
 
@@ -246,23 +356,24 @@ def similar(body: SimilarRequest):
     _require_niche(body.niche)
 
     tfidf = load_tfidf(body.niche)
-    df = load_niche_csv(body.niche)
-
-    high_df = df[
-        df["performance_label"].isin(["High", "Viral"])
-    ].copy()
-
-    if high_df.empty:
+    ref = load_reference_set(body.niche)
+    titles = ref.get("titles") or []
+    corpus_vec = ref.get("vectors")
+    if not titles or corpus_vec is None or corpus_vec.shape[0] == 0:
         return {"similar_titles": []}
 
+    channels, views, labels = _reference_metadata(body.niche, ref)
+
     query_vec = tfidf.transform([body.title])
-    corpus_vec = tfidf.transform(
-        high_df["title"].fillna("").tolist()
-    )
     sims = cosine_similarity(query_vec, corpus_vec)[0]
 
-    high_df = high_df.copy()
-    high_df["similarity_score"] = sims
+    high_df = pd.DataFrame({
+        "title": titles,
+        "channel_title": channels,
+        "view_count": views,
+        "performance_label": labels,
+        "similarity_score": sims,
+    })
     high_df = high_df.sort_values(
         "similarity_score", ascending=False
     )
@@ -292,56 +403,7 @@ def insights(niche: str):
 
 @app.post("/gaps")
 def gaps(body: GapsRequest):
-    _require_niche(body.niche)
-
-    tfidf = load_tfidf(body.niche)
-    kmeans = load_kmeans(body.niche)
-    cluster_keywords = load_clusters(body.niche)
-    df = load_niche_csv(body.niche)
-
-    cleaned_titles = df.apply(
-        lambda row: clean_title(
-            row.get("title", ""),
-            row.get("channel_title", ""),
-        ),
-        axis=1,
-    )
-    vectors = tfidf.transform(cleaned_titles.fillna("").tolist())
-    cluster_labels = kmeans.predict(vectors)
-
-    df = df.copy()
-    df["cluster_id"] = cluster_labels
-
-    cluster_avgs = (
-        df.groupby("cluster_id")["view_count"]
-        .mean()
-        .to_dict()
-    )
-    overall_avg = float(np.mean(list(cluster_avgs.values())))
-
-    gap_results = []
-    for cluster_id, avg_views in cluster_avgs.items():
-        if avg_views >= overall_avg:
-            continue
-
-        opportunity_score = round(
-            float((overall_avg - avg_views) / max(overall_avg, 1)),
-            4,
-        )
-        keywords = cluster_keywords.get(str(cluster_id), [])
-        gap_results.append({
-            "cluster_id": int(cluster_id),
-            "keywords": keywords,
-            "avg_views": round(float(avg_views), 2),
-            "opportunity_score": opportunity_score,
-        })
-
-    gap_results.sort(
-        key=lambda item: item["opportunity_score"],
-        reverse=True,
-    )
-
-    return {"gaps": gap_results}
+    return {"gaps": load_gaps_csv(body.niche)}
 
 
 @app.post("/channel/analyze")

@@ -82,5 +82,7 @@ alembic.ini
 alembic/
 # Optional: uncomment if you prefer not to commit large generated artifacts
 # backend/data/*.csv
-# backend/saved_models/*.pkl
 # backend/insights/*.json
+
+# Large blend models (exceed GitHub 100MB limit) — keep local only
+backend/saved_models/blend_*.pkl

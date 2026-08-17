@@ -13,6 +13,9 @@ import LoadingSpinner from '../components/LoadingSpinner';
 const defaultPanel = {
   title: '',
   niche: 'gaming',
+  duration_seconds: 600,
+  day_of_week: 2,
+  hour_of_day: 14,
 };
 
 export default function ABTest() {
@@ -36,6 +39,12 @@ export default function ABTest() {
         niche: panelA.niche,
         title_a: panelA.title.trim(),
         title_b: panelB.title.trim(),
+        duration_seconds_a: Number(panelA.duration_seconds) || 600,
+        duration_seconds_b: Number(panelB.duration_seconds) || 600,
+        day_of_week_a: Number(panelA.day_of_week),
+        day_of_week_b: Number(panelB.day_of_week),
+        hour_of_day_a: Number(panelA.hour_of_day),
+        hour_of_day_b: Number(panelB.hour_of_day),
       });
       setResult(comparison);
     } catch (e) {
@@ -56,7 +65,7 @@ export default function ABTest() {
         <SectionHeader
           label="A/B TEST"
           title="Title A/B Tester"
-          subtitle="Compare two title ideas in the same niche. The winner is closer to proven High/Viral titles."
+          subtitle="Compare two title ideas in the same niche with the Random Forest blend model (titles + planned duration/upload time)."
         />
 
         <div className="mb-6 max-w-xs">
@@ -77,26 +86,64 @@ export default function ABTest() {
         </div>
 
         <div className="flex flex-col lg:flex-row gap-5 mb-8">
-          <GlassCard className="p-6 flex-1" accent="#ff0000">
-            <h3 className="section-heading text-lg mb-5">Title A</h3>
-            <label className="field-label">Title</label>
-            <input
-              className="input-field"
-              placeholder="Enter title..."
-              value={panelA.title}
-              onChange={(e) => setPanelA({ ...panelA, title: e.target.value })}
-            />
-          </GlassCard>
-          <GlassCard className="p-6 flex-1" accent="#a855f7">
-            <h3 className="section-heading text-lg mb-5">Title B</h3>
-            <label className="field-label">Title</label>
-            <input
-              className="input-field"
-              placeholder="Enter title..."
-              value={panelB.title}
-              onChange={(e) => setPanelB({ ...panelB, title: e.target.value })}
-            />
-          </GlassCard>
+          {[
+            { key: 'A', panel: panelA, setPanel: setPanelA, accent: '#ff0000' },
+            { key: 'B', panel: panelB, setPanel: setPanelB, accent: '#a855f7' },
+          ].map(({ key, panel, setPanel, accent }) => (
+            <GlassCard key={key} className="p-6 flex-1" accent={accent}>
+              <h3 className="section-heading text-lg mb-5">Title {key}</h3>
+              <label className="field-label">Title</label>
+              <input
+                className="input-field mb-4"
+                placeholder="Enter title..."
+                value={panel.title}
+                onChange={(e) => setPanel({ ...panel, title: e.target.value })}
+              />
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="field-label">Duration (sec)</label>
+                  <input
+                    className="input-field"
+                    type="number"
+                    min={30}
+                    value={panel.duration_seconds}
+                    onChange={(e) =>
+                      setPanel({
+                        ...panel,
+                        duration_seconds: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="field-label">Day (0–6)</label>
+                  <input
+                    className="input-field"
+                    type="number"
+                    min={0}
+                    max={6}
+                    value={panel.day_of_week}
+                    onChange={(e) =>
+                      setPanel({ ...panel, day_of_week: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="field-label">Hour (0–23)</label>
+                  <input
+                    className="input-field"
+                    type="number"
+                    min={0}
+                    max={23}
+                    value={panel.hour_of_day}
+                    onChange={(e) =>
+                      setPanel({ ...panel, hour_of_day: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+            </GlassCard>
+          ))}
         </div>
 
         <div className="flex justify-center mb-8">
