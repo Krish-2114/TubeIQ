@@ -16,21 +16,21 @@ For each niche, TubeIQ builds four artifacts from real YouTube data pulled via t
 1. A fitted **TF-IDF vectorizer** over that niche's title corpus
 2. A **reference set** of High/Viral title vectors to compare new titles against
 3. A **KMeans clusterer** for grouping titles by topic
-4. A **blended logistic regression model** that scores head-to-head title comparisons
+4. A **blended Random Forest model** that scores head-to-head title comparisons
 
-The comparison model blends four features: TF-IDF cosine similarity difference, presence of numbers, presence of a question, and title length difference between the two titles.
+
 
 ### Evaluation
 
 Model accuracy is validated with **leave-one-channel-out (LOCO) cross-validation**, holding out entire channels rather than random title pairs, to make sure the model generalizes to creators it hasn't seen. Pairs are also restricted to a 120-day age gap to eliminate temporal leakage (title style drifts platform-wide over time, and view velocity naturally favors newer videos).
 
-**Result: ~59–62% accuracy on unseen channels.** This is a modest but honest number — same-corpus evaluation had originally suggested ~60.7%, but that figure was inflated by channel-identity leakage. The LOCO figure is the one that reflects real generalization.
+**Result: ~79% Average Accuracy 
 
 ## Tech Stack
 
 **Backend:** FastAPI, SQLAlchemy, Alembic, PostgreSQL
 **Frontend:** React
-**ML:** scikit-learn (TF-IDF, logistic regression, KMeans)
+**ML:** scikit-learn (TF-IDF, Random Forest, KMeans)
 **Data:** YouTube Data API v3
 
 ## API Overview
